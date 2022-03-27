@@ -1,5 +1,5 @@
 package com.example.logs.models;
-import com.example.visitorslogs.dtos.SignupRequestDto;
+import com.example.logs.dtos.SignupRequestDto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

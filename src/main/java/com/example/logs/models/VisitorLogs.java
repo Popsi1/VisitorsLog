@@ -1,5 +1,5 @@
 package com.example.logs.models;
-import com.example.visitorslogs.dtos.VisitorLogsDto;
+import com.example.logs.dtos.VisitorLogsDto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
