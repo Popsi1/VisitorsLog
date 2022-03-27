@@ -1,5 +1,5 @@
 package com.example.logs.repositories;
-import com.example.visitorslogs.models.Visitor;
+import com.example.logs.models.Visitor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
