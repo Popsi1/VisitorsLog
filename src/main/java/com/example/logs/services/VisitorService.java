@@ -1,127 +1,87 @@
 package com.example.logs.services;
+
 import com.example.logs.constant.Constants;
 import com.example.logs.dtos.ServiceResponseDto;
-import com.example.logs.exceptions.IncorrectPasswordException;
+import com.example.logs.dtos.SignupRequestDto;
+import com.example.logs.dtos.VisitorLogsDto;
 import com.example.logs.exceptions.StaffNotFoundException;
-import com.example.logs.exceptions.UsernameAlreadyExistException;
 import com.example.logs.exceptions.VisitorNotFoundException;
-import com.example.logs.models.Staff;
-import com.example.logs.models.Visitor;
+import com.example.logs.models.User;
 import com.example.logs.models.VisitorLogs;
-import com.example.logs.repositories.StaffRepository;
+import com.example.logs.repositories.UserRepository;
 import com.example.logs.repositories.VisitorLogsRepository;
-import com.example.logs.repositories.VisitorRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.example.logs.enums.UserRole.VISITOR;
+
 @Service
+@RequiredArgsConstructor
 public class VisitorService {
 
-    @Autowired
-    private VisitorRepository visitorRepository;
+    private final UserRepository userRepository;
+    private final UserService userService;
+    private final VisitorLogsRepository visitorLogsRepository;
+    private final ModelMapper modelMapper;
+    private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private StaffRepository staffRepository;
 
-    @Autowired
-    private VisitorLogsRepository visitorLogsRepository;
-
-    @Autowired
-    private StaffService staffService;
-
-    public String addNewVisitor(Visitor visitor) {
-        Visitor visitorByUsername =visitorRepository.findVisitorByUserName(visitor.getUserName());
-        Staff staffByUsername = staffRepository.findStaffByUserName(visitor.getUserName());
-
-        try {
-            if (staffByUsername.getUserName() != null) {
-                throw new UsernameAlreadyExistException(staffByUsername.getUserName() + " already exist");
-            }
-        }catch (NullPointerException ex){
-
-        }
-
-        try {
-            if (visitorByUsername.getUserName() != null) {
-                throw new UsernameAlreadyExistException(visitorByUsername.getUserName() + " already exist");
-            }
-        }catch (NullPointerException ex){
-
-        }
-
-        visitorRepository.save(visitor);
+    public String addNewVisitor(SignupRequestDto signupRequestDto) {
+        userService.checkIfUsernameOrEmailAlreadyExist(signupRequestDto);
+        User newVisitor = modelMapper.map(signupRequestDto, User.class);
+        newVisitor.setPassword(passwordEncoder.encode(newVisitor.getPassword()));
+        newVisitor.setRole(VISITOR);
+        userRepository.save(newVisitor);
 
         return Constants.SIGNUP;
     }
 
     public List<ServiceResponseDto> getAllVisitors(){
         List<ServiceResponseDto> listOfAllVisitors = new ArrayList<>();
-        ServiceResponseDto serviceResponseDto = new ServiceResponseDto();
-        List<Visitor> allVisitorsSaved = visitorRepository.findAll();
+        List<User> allVisitorsSaved = userRepository.findUsersByRole(VISITOR);
 
-        for(int i=0; i<allVisitorsSaved.size(); i++){
-            Visitor visitor = allVisitorsSaved.get(i);
-            serviceResponseDto.setName(visitor.getName());
-            serviceResponseDto.setEmail(visitor.getEmail());
-            serviceResponseDto.setPhoneNumber(visitor.getPhoneNumber());
-            serviceResponseDto.setAddress(visitor.getAddress());
-
-            listOfAllVisitors.add(serviceResponseDto);
+        for (User visitor : allVisitorsSaved) {
+            ServiceResponseDto responseDto = modelMapper.map(visitor, ServiceResponseDto.class);
+            listOfAllVisitors.add(responseDto);
         }
 
         return listOfAllVisitors;
     }
 
-    public Visitor getVisitor(Long visitorId){
-        Visitor visitor = visitorRepository.findById(visitorId).orElseThrow(() -> new VisitorNotFoundException("visitor not found"));
-
-        return visitor;
+    public ServiceResponseDto getVisitor(Long visitorId){
+        User visitor = userRepository.findById(visitorId).orElseThrow(() ->
+                new VisitorNotFoundException("visitor not found"));
+        return modelMapper.map(visitor, ServiceResponseDto.class);
     }
 
-    public Visitor getVisitorByUsernameAndPassword(String username, String password){
-        Visitor visitorByUserName = visitorRepository.findVisitorByUserName(username);
-        Visitor visitorByUserNameAndPassword = null;
+    public String logsNewVisit(Long visitorId, VisitorLogsDto visitorLogs){
+        UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        String username = userDetails.getUsername();
+        User staff = userRepository.findUserByUsername(username).orElseThrow(()->
+                new StaffNotFoundException("Staff not found"));
 
-        try {
-            if (password.equals(visitorByUserName.getPassword())) {
-                visitorByUserNameAndPassword = visitorRepository.findVisitorByUserNameAndPassword(username, password);
-            } else {
-                throw new IncorrectPasswordException("incorrect password");
-            }
-        }catch (NullPointerException ex){
+        User visitor = userRepository.findById(visitorId).orElseThrow(()->
+                new VisitorNotFoundException("Visitor not found"));
 
-        }
+        VisitorLogs newVisitLog = new VisitorLogs();
+        newVisitLog.setVisitor(visitor);
+        newVisitLog.setStaff(staff);
+        newVisitLog.setReasonForVisit(visitorLogs.getReasonForVisit());
+        newVisitLog.setDateOfVisit(Date.valueOf(LocalDate.now()));
+        visitorLogsRepository.save(newVisitLog);
 
-        return visitorByUserNameAndPassword;
-    }
-
-    public String logsNewVisit(Long visitorId, Long staffId, VisitorLogs visitorLogs){
-        Visitor visitor = getVisitor(visitorId);
-        Staff staff = staffService.getStaff(staffId);
-
-        try {
-            if (staff.getUserName() == null) {
-                throw new StaffNotFoundException(staff + " not found");
-            }
-        }catch (NullPointerException ex){
-
-        }
-
-        try {
-            if (visitor.getUserName() == null) {
-                throw new VisitorNotFoundException(visitor + " not found");
-            }
-        }catch (NullPointerException ex){
-
-        }
-
-        visitorLogs.setVisitor(visitor);
-        visitorLogs.setStaff(staff);
-        visitorLogs.getVisitor().setStaff(staff);
-        visitorLogsRepository.save(visitorLogs);
+        emailService.send(staff.getEmail(), visitor.getName() + Constants.BODY + newVisitLog.getDateOfVisit().toString(), Constants.SUBJECT);
 
         return Constants.LOG_CREATED;
     }

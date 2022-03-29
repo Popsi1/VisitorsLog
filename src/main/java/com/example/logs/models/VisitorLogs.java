@@ -1,5 +1,5 @@
 package com.example.logs.models;
-import com.example.logs.dtos.VisitorLogsDto;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,18 +27,10 @@ public class VisitorLogs extends BaseModel{
 
     @ManyToOne
     @JoinColumn
-    private Staff staff;
+    private User staff;
 
     @ManyToOne
     @JoinColumn
-    private Visitor visitor;
+    private User visitor;
 
-    public static VisitorLogs from(VisitorLogsDto visitorLogsDto) {
-        VisitorLogs visitorLogs = new VisitorLogs();
-        visitorLogs.setReasonForVisit(visitorLogsDto.getReasonForVisit());
-        Date date = Date.valueOf(visitorLogsDto.getDateOfVisit());
-        visitorLogs.setDateOfVisit(date);
-
-        return visitorLogs;
-    }
 }
